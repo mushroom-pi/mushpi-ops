@@ -59,7 +59,7 @@ Enforced by the local pre-tag check (subsection 9) — and, once publishing is l
 *Cross-reference only — the pipeline itself is defined in `publish.yml`; don't duplicate it here.*
 
 - On a `v*` tag push, `publish.yml` builds from **this repo@tag** (the tag pins the Dockerfile, compose, CI workflow, and `release.json`) plus `mushpi-server` and `mushpi-client` checked out at their **default-branch HEAD** — the tag pins no sub-repo code (`REFERENCE.md` → Tag & CI semantics). On tag builds the workflow also checks out `mushpi-grow` and `mushpi-mock` and runs the bundle-parity check.
-- Image tags derive from the git tag: `type=ref,event=tag` keeps the `v` (image tag `v0.8.0`), plus a `sha-<short>` tag; metadata-action's default `latest=auto` flavor also retags `latest` on tag pushes (the workflow's explicit `latest` line is branch-only — `enable={{is_default_branch}}` evaluates false on tag events).
+- Image tags: `type=ref,event=tag` keeps the `v` (image tag `v0.8.0`), plus a `sha-<short>` tag. `latest` is **not** derived from a tag — it is bound to the `main` branch **by ref** (`type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}`), deliberately not by the repository's default-branch setting, so changing which branch is the default cannot silently disable the `latest` tag.
 - **The release version is the image-version axis.** The server's own version rides *inside* the image (`package.json` + the OpenAPI `info.version`) — it is not the image tag.
 - **Firmware never enters the image** — Pico units are flashed over USB; the manifest is the only place a release records the firmware it was tested against.
 
@@ -67,10 +67,10 @@ Enforced by the local pre-tag check (subsection 9) — and, once publishing is l
 
 The operational form of `versioning.md` §7. All paths are relative to this repo's root unless a directory is given.
 
-1. **Decide the bump types** per component using `versioning.md` §2's rules — and whether the Pico↔Server contract broke (§4), which determines `api_version`.
+1. **Decide the bump types** per component using `versioning.md` §2's rules — and whether the Pico↔Server contract broke (`versioning.md` §4), which determines `api_version`.
 2. **Bump the three component version fields:** firmware `_SOFTWARE_VERSION` (`mushpi-grow/app/state.py`), server `package.json` `version`, client `package.json` `version`.
-3. **Regenerate the client** if the server's OpenAPI contract changed: `yarn gen:all:remote` in `mushpi-client/` (build-time lockstep, §5).
-4. **Sync the mock** if the firmware bumped: `src/mushpi_mock/VERSION` and the mock's `state.py::_SOFTWARE_VERSION` to the new firmware version (§6).
+3. **Regenerate the client** if the server's OpenAPI contract changed: `yarn gen:all:remote` in `mushpi-client/` (build-time lockstep, `versioning.md` §5).
+4. **Sync the mock** if the firmware bumped: `src/mushpi_mock/VERSION` and the mock's `state.py::_SOFTWARE_VERSION` to the new firmware version (`versioning.md` §6).
 5. **Verify the bundle:** in `mushpi-server/` `yarn build && yarn lint && yarn test && yarn test:e2e`; in `mushpi-client/` `yarn build && yarn lint`; optionally a mock integration run (the mock stands in for hardware — see subsection 7).
 6. **Write `release.json`** in this repo (schema: `versioning.md` §3.1), reading every value **live from its source of truth** — never from memory:
    - server: `jq -r .version mushpi-server/package.json`

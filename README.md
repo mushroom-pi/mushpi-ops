@@ -1,0 +1,35 @@
+# Mushroom Pi — Ops (Release & Packaging)
+
+This repository publishes the single container image for the Mushroom Pi system. One image serves the NestJS API and the built React dashboard on port 3000, targeting a Raspberry Pi 3 (1GB).
+
+The image is published to **`ghcr.io/mushroom-pi/mushpi-ops`**. This repo also owns the compose service definition and the release manifest that pin which component versions ship together.
+
+## Run it
+
+The self-hosting path — no build step, no agent tooling:
+
+```bash
+git clone https://github.com/mushroom-pi/mushpi-ops.git mushpi-ops
+cd mushpi-ops
+cp .env.example .env       # set PICO_ANNOUNCE_SECRET
+docker compose up -d
+```
+
+Open port 3000. This pulls the published image — you never build locally. Full deployment instructions (SD-card provisioning, first boot, Pico unit setup, the update workflow, backups, Tailscale remote access) are in `DEPLOYMENT.md`.
+
+The local build toggle `docker-compose.override.yml` is deliberately untracked, so it never appears in a clone: a plain `docker compose up -d` always pulls the published image. Maintainers who want to build from source keep a local copy of that override.
+
+## What's here
+
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | Compose service that pulls the published image |
+| `Dockerfile` | Builds the single-container image from this repo's root as context |
+| `.env.example` | Environment template (`PICO_ANNOUNCE_SECRET` plus optional overrides) |
+| `release.json` | Release manifest — the component versions in this bundle |
+| `scripts/verify-release.sh` | Checks the manifest against the committed component versions |
+| `.github/workflows/publish.yml` | CI: builds and pushes the image on `main` and `v*` tags |
+| `DEPLOYMENT.md` | How to run it (operators) |
+| `MAINTAINING.md` | How to build and release it (maintainers) |
+
+Application code lives in the sibling repositories `mushpi-server`, `mushpi-client`, `mushpi-grow`, and `mushpi-mock` — this repo holds the packaging layer only.

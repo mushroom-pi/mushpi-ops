@@ -45,7 +45,7 @@ Run from this repo's root:
 - **The `vX.Y.Z` tag and `release.json` change in one commit.** They are an intra-repo pair; keeping them atomic is what makes the tag⇔manifest guard meaningful.
 - **The image name is pinned to the product name** (`ghcr.io/${{ github.repository_owner }}/mushpi`), deliberately decoupled from this repo's name. Renaming this repo does **not** rename the published image; changing the image name is a deliberate product decision, not a side effect of a repo rename.
 - **A push to `main` or a `v*` tag triggers a publish.** A tag also pins only this repo's files while sub-repos build at default-branch HEAD — push sub-repo release commits first.
-- **Register split:** agent rules live here and in `REFERENCE.md`; human procedures live in `DEPLOYMENT.md` and `MAINTAINING.md`. Do not put agent-directed instructions in the human-named docs, and do not restate them here.
+- **Register split:** agent rules live here and in `REFERENCE.md`; human procedures live in `DEPLOYMENT.md` and `MAINTAINING.md`. Do not put agent-directed instructions in the human-named docs, and do not restate them here. All three human-facing files (`DEPLOYMENT.md`, `MAINTAINING.md`, `README.md`) are **docs-tier**: the ops agents' edit permission maps exclude them, so an ops agent flags a needed change for the orchestrator to route rather than editing it.
 
 ## ⛔ Data Deletion Prohibition
 

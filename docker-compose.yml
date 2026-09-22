@@ -2,7 +2,9 @@ services:
   mushpi:
     image: ghcr.io/mushroom-pi/mushpi-ops:latest
 
-    # Developer source build (build context = this repository root):
+    # Developer source build (build context = this repository root; the sibling
+    # sub-repos are materialized as transient clones — see REFERENCE.md — so a
+    # bare clone has nothing to build):
     #   build:
     #     context: .
     #     args:

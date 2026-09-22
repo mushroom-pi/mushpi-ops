@@ -3,9 +3,10 @@
 ###############################################################################
 # Single-container image: mushpi-server (NestJS) + the built mushpi-client SPA.
 #
-# Build context = this repository root (mushroom-pi/), which contains the
-# sibling sub-repos mushpi-server/ and mushpi-client/. CI checks both out here;
-# self-hosters never build at all — they pull the published image.
+# Build context = this repository's root (the mushpi-ops checkout). The sibling
+# sub-repos mushpi-server/ and mushpi-client/ are materialized inside it by CI,
+# or by transient local clones (recipe: REFERENCE.md). Self-hosters never build
+# at all — they pull the published image.
 ###############################################################################
 
 ###############################################################################

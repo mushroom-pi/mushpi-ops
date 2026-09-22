@@ -12,7 +12,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # This workflow lives in the mushroom-pi/mushpi-ops orchestration repo, so this
+  # This workflow lives in the mushroom-pi/mushpi-ops release repo, so this
   # resolves to ghcr.io/mushroom-pi/mushpi-ops (the published image name).
   IMAGE_NAME: ${{ github.repository }}
 
@@ -20,7 +20,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout this repository (orchestration + Docker + CI)
+      - name: Checkout this repository (Dockerfile, compose, CI, release manifest)
         uses: actions/checkout@v4
 
       - name: Checkout mushpi-server into ./mushpi-server
@@ -34,6 +34,20 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/mushpi-client
           path: mushpi-client
+
+      - name: Checkout mushpi-grow into ./mushpi-grow
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/mushpi-grow
+          path: mushpi-grow
+
+      - name: Checkout mushpi-mock into ./mushpi-mock
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/mushpi-mock
+          path: mushpi-mock
 
       # ── Release-manifest guard. Runs only on v* tag pushes; fails before
       # anything reaches GHCR if the tag doesn't match release.json at the
@@ -68,8 +82,17 @@ jobs:
           fi
           echo "release.json OK: v${tag_ver} = ${srv_act}+${cli_act}, firmware $(jq -r .firmware release.json), api_version $(jq -r .api_version release.json)"
 
+      # ── Bundle-parity check. Runs only on v* tag pushes, after all four
+      # sub-repos are checked out. `verify-release.sh` cross-checks the
+      # manifest against each sub-repo's committed version (server/client
+      # package.json, grow `_SOFTWARE_VERSION` + spec, mock VERSION), so it
+      # needs the grow and mock checkouts above.
+      - name: Verify bundle parity
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: bash scripts/verify-release.sh "${GITHUB_REF_NAME}"
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: actions/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

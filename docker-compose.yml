@@ -1,0 +1,31 @@
+services:
+  mushpi:
+    image: ghcr.io/mushroom-pi/mushpi-ops:latest
+
+    # Developer source build (build context = this repository root):
+    #   build:
+    #     context: .
+    #     args:
+    #       VITE_API_BASE_URL: /
+
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env          # PICO_ANNOUNCE_SECRET, optional APP_HOST
+
+    environment:
+      NODE_ENV: prod
+      PORT: "3000"
+      SQLITE_PATH: /data/app.sqlite
+      UPLOAD_DIR: /data
+      LOGS_PATH: /data/logs
+
+    volumes:
+      # Persists SQLite DB + uploaded images + logs across restarts/reimages.
+      # Create ./data once as your normal user (the Pi 'pi' user is UID 1000,
+      # matching the image's `node` user); if it's owned by root run:
+      #   sudo chown -R 1000:1000 ./data
+      - ./data:/data

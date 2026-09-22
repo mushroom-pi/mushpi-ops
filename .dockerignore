@@ -1,0 +1,49 @@
+# VCS
+.git
+**/.git
+
+# Dependencies + build output — rebuilt inside the image
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+.yarn/cache
+**/.yarn/cache
+.yarn/install-state.gz
+
+# Runtime data — must never be baked into the image
+data
+data-test
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Secrets
+.env
+.env.prod
+.env.local
+**/.env
+**/.env.prod
+**/.env.local
+
+# Build tooling not needed in the context
+Dockerfile
+docker-compose.yml
+docker-compose*.yml
+.dockerignore
+README.md
+
+# Sub-repos not part of the image build context (keep the context lean)
+mushpi-grow
+mushpi-mock
+mushpi-docs
+be-pico-hub
+.opencode
+
+# IDE / hooks
+.vscode
+.idea
+.husky

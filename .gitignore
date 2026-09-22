@@ -1,0 +1,43 @@
+# Ignore everything by default; the allowlist below is the tracked set —
+# the release/packaging layer only.
+*
+
+!.gitignore
+!AGENTS.md
+!REFERENCE.md
+!README.md
+!Dockerfile
+!docker-compose.yml
+!.dockerignore
+!.env.example
+!release.json
+!DEPLOYMENT.md
+!MAINTAINING.md
+!scripts/
+!scripts/**
+!.github/
+!.github/**
+!.github/workflows/**
+
+# Local build toggle — deliberately untracked: self-hosters' clones never
+# contain it (they pull the published image); maintainers keep a local copy
+# to switch compose from pull to build.
+docker-compose.override.yml
+
+# Local secrets — never tracked. (.env.example is re-allowed AFTER the
+# .env.* ignore because rules are last-wins.)
+.env
+.env.*
+!.env.example
+
+# Transient sibling checkouts materialized for local builds and verify runs
+# (CI materializes these from GitHub; they are never part of this repo).
+mushpi-server/
+mushpi-client/
+mushpi-grow/
+mushpi-mock/
+mushpi-docs/
+
+# Runtime data on machines that run the stack from this directory
+# (SQLite DB, uploaded images, logs).
+data/

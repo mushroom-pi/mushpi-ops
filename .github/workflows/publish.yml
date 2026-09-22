@@ -111,11 +111,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # `latest` is bound to `main` by ref, not by the repository's
+          # default-branch setting. This repo was born with an unborn `main`,
+          # and GitHub makes the first branch pushed the default — so a
+          # default-branch-based gate could silently stop applying `latest` on
+          # `main` pushes. The explicit ref test cannot be disabled that way.
           tags: |
             type=ref,event=branch
             type=ref,event=tag
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6

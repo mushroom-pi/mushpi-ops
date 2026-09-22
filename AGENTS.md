@@ -1,6 +1,6 @@
 # mushpi-ops — Release & Packaging
 
-This repo is the **release/packaging layer** for the Mushroom Pi system. It owns the container build, the compose service definition, the release manifest, and the publish workflow. It publishes the single image `ghcr.io/mushroom-pi/mushpi-ops` — the server API and the built React dashboard on one port.
+This repo is the **release/packaging layer** for the Mushroom Pi system. It owns the container build, the compose service definition, the release manifest, and the publish workflow. It publishes the single image `ghcr.io/mushroom-pi/mushpi` — the server API and the built React dashboard on one port.
 
 It is **not a runtime tier** and contains no application code. The orchestration root (its sibling directory) owns the agent definitions, the full-stack architecture context, and the cross-repo contracts. The sub-repos — `mushpi-server`, `mushpi-client`, `mushpi-grow`, `mushpi-mock`, `mushpi-docs` — are sibling git repos, never vendored here.
 
@@ -12,7 +12,7 @@ On-demand gotchas for editing this layer live in [`REFERENCE.md`](./REFERENCE.md
 |---|---|
 | `.github/workflows/publish.yml` | CI: on push to `main` or a `v*` tag, checks out the sub-repos, runs the tag⇔manifest guard and the parity check, builds and pushes the image to GHCR |
 | `Dockerfile` | Three-stage build (client → server → runtime); build context = this repo's root |
-| `docker-compose.yml` | Compose service that pulls `ghcr.io/mushroom-pi/mushpi-ops:latest` |
+| `docker-compose.yml` | Compose service that pulls `ghcr.io/mushroom-pi/mushpi:latest` |
 | `docker-compose.override.yml` | Local build toggle — **untracked by design**, absent from clones |
 | `.dockerignore` | Build-context exclusions |
 | `.gitignore` | Ignore-all-then-allowlist; the tracked set is exactly the packaging layer |
@@ -43,7 +43,7 @@ Run from this repo's root:
 
 - **Never commit `.env` or `data/`.** Both are gitignored; `.env` holds local secrets and `data/` holds live runtime state (SQLite DB, uploaded images, logs).
 - **The `vX.Y.Z` tag and `release.json` change in one commit.** They are an intra-repo pair; keeping them atomic is what makes the tag⇔manifest guard meaningful.
-- **The image name is derived from this repo's name** (`${{ github.repository }}`). Renaming the repo renames the published image.
+- **The image name is pinned to the product name** (`ghcr.io/${{ github.repository_owner }}/mushpi`), deliberately decoupled from this repo's name. Renaming this repo does **not** rename the published image; changing the image name is a deliberate product decision, not a side effect of a repo rename.
 - **A push to `main` or a `v*` tag triggers a publish.** A tag also pins only this repo's files while sub-repos build at default-branch HEAD — push sub-repo release commits first.
 - **Register split:** agent rules live here and in `REFERENCE.md`; human procedures live in `DEPLOYMENT.md` and `MAINTAINING.md`. Do not put agent-directed instructions in the human-named docs, and do not restate them here.
 

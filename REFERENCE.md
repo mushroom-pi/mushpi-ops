@@ -40,7 +40,7 @@ Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-
 
 ## Tag & CI semantics
 
-- The image name derives from `${{ github.repository }}`, so renaming this repo renames the published image.
+- The image name is `ghcr.io/${{ github.repository_owner }}/mushpi`, deliberately decoupled from this repo's name. Renaming this repo does **not** rename the published image; changing the image name is a deliberate product decision, not a side effect of a repo rename.
 - A `vX.Y.Z` tag pins only **this repo's** files (Dockerfile, compose, CI, `release.json`). Sub-repos build at their **default-branch HEAD**, not at any ref the tag records — so sub-repo release commits (including `mushpi-mock`) must be pushed **before** the tag.
 - On tag builds CI checks out all four sub-repos and runs `scripts/verify-release.sh` (the parity check), which cross-checks the manifest against each sub-repo's committed version. Grow and mock are checked out solely so that check can run; they never enter the image.
 

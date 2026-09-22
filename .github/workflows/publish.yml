@@ -12,9 +12,11 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # This workflow lives in the mushroom-pi/mushpi-ops release repo, so this
-  # resolves to ghcr.io/mushroom-pi/mushpi-ops (the published image name).
-  IMAGE_NAME: ${{ github.repository }}
+  # The image is named for the product, deliberately decoupled from this repo's
+  # name: the artifact ships the server API + the built dashboard, so it is
+  # published as ghcr.io/mushroom-pi/mushpi rather than after the packaging repo.
+  # The owner is interpolated so an org rename cannot break the name.
+  IMAGE_NAME: ${{ github.repository_owner }}/mushpi
 
 jobs:
   build-and-push:

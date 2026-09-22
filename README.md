@@ -1,8 +1,10 @@
-# Mushroom Pi — Ops (Release & Packaging)
+# 🍄 Mushroom Pi 🍓 — Ops (Release & Packaging)
+
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white)
 
 This repository publishes the single container image for the Mushroom Pi system. One image serves the NestJS API and the built React dashboard on port 3000, targeting a Raspberry Pi 3 (1GB).
 
-The image is published to **`ghcr.io/mushroom-pi/mushpi-ops`**. This repo also owns the compose service definition and the release manifest that pin which component versions ship together.
+The image is published to **`ghcr.io/mushroom-pi/mushpi`**. This repo also owns the compose service definition and the release manifest that pin which component versions ship together.
 
 ## Run it
 

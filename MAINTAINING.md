@@ -4,7 +4,7 @@ This is the maintainer-facing half: packaging internals and the release process.
 
 ## How the image is built
 
-The image is built by `Dockerfile` from this repository's root as its Docker context. CI checks out the two build inputs — `mushpi-server` and `mushpi-client` — into that root and builds there; on a `v*` tag it also checks out `mushpi-grow` and `mushpi-mock` so the bundle-parity check can run. Firmware never enters the image; the manifest records what the bundle was tested against. The result is pushed to `ghcr.io/mushroom-pi/mushpi-ops`, a name derived from `github.repository`. Locally, the siblings are materialized as transient clones inside this repo; the recipe and the packaging guardrails are in `REFERENCE.md`.
+The image is built by `Dockerfile` from this repository's root as its Docker context. CI checks out the two build inputs — `mushpi-server` and `mushpi-client` — into that root and builds there; on a `v*` tag it also checks out `mushpi-grow` and `mushpi-mock` so the bundle-parity check can run. Firmware never enters the image; the manifest records what the bundle was tested against. The result is pushed to `ghcr.io/mushroom-pi/mushpi`, the product name pinned via `github.repository_owner` and deliberately decoupled from this repo's name. Locally, the siblings are materialized as transient clones inside this repo; the recipe and the packaging guardrails are in `REFERENCE.md`.
 
 ## Container Networking Notes (mDNS / `.local`)
 

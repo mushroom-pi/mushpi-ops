@@ -1,6 +1,6 @@
 services:
   mushpi:
-    image: ghcr.io/mushroom-pi/mushpi-ops:latest
+    image: ghcr.io/mushroom-pi/mushpi:latest
 
     # Developer source build (build context = this repository root; the sibling
     # sub-repos are materialized as transient clones — see REFERENCE.md — so a

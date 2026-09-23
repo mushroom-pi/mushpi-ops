@@ -103,6 +103,12 @@ COPY --from=client-build /app/dist ./client
 # so it must ship in the runtime image or the assets 404.
 COPY --from=server-build /app/public ./public
 
+# Data-directory guard — runs before the server command, as the `node` user
+# (see the ENTRYPOINT below): verifies /data and its subdirs are writable and
+# fails with an operator-readable hint otherwise.
+COPY scripts/docker-entrypoint.sh /usr/src/app/docker-entrypoint.sh
+RUN chmod +x /usr/src/app/docker-entrypoint.sh
+
 # ServeStaticModule requires this absolute path in prod (Joi-enforced).
 ENV CLIENT_DIST_DIR=/usr/src/app/client
 
@@ -118,4 +124,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+ENTRYPOINT ["/usr/src/app/docker-entrypoint.sh"]
 CMD ["node", "dist/src/main.js"]

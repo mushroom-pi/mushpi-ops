@@ -17,7 +17,7 @@ cp .env.example .env       # set PICO_ANNOUNCE_SECRET
 docker compose up -d
 ```
 
-Open port 3000. This pulls the published image — you never build locally. Full deployment instructions (SD-card provisioning, first boot, Pico unit setup, the update workflow, backups, Tailscale remote access) are in `DEPLOYMENT.md`.
+Open port 3000. This pulls the published image — you never build locally. The compose file reads two optional variables from `.env`: `MUSHPI_DATA_DIR` (the host directory holding the database, images and logs; defaults to `./mushpi-data`) and `MUSHPI_IMAGE_TAG` (the image tag to pull; defaults to `latest`). Full deployment instructions (SD-card provisioning, first boot, Pico unit setup, the update workflow, backups, Tailscale remote access) are in `DEPLOYMENT.md`.
 
 The local build toggle `docker-compose.override.yml` is deliberately untracked, so it never appears in a clone: a plain `docker compose up -d` always pulls the published image. Maintainers who want to build from source keep a local copy of that override.
 

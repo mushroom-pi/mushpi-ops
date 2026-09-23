@@ -29,7 +29,7 @@ How the server reaches Pico units from inside the container. This is factual beh
 
 A release is a **git tag `vX.Y.Z`** on this repo (`mushpi-ops`) plus a **committed `release.json` manifest at this repo's root**, kept in lockstep. The statement it makes — "these specific component versions are tested to work together" — and the 5-field manifest schema live in `versioning.md` §3 / §3.1; tag ⇔ manifest equality is enforced twice (subsection 4's consistency rule, via the local pre-tag check and the CI manifest guard below).
 
-> **CI status note:** `publish.yml` lives in this repo and triggers on pushes to `main` and on `v*` tags. The first published image comes from this repo's first `v*` tag cut after the release-repo split lands; before that there are no published image tags to watch.
+> **CI status note:** `publish.yml` lives in this repo and triggers on pushes to `main` and on `v*` tags. A push to `main` publishes an image but does **not** create a GitHub Release, git tag or `release.json` change — those happen only on a `v*` tag push. The first published image comes from this repo's first `v*` tag cut after the release-repo split lands; before that there are no published image tags to watch.
 
 ### 2. When to cut a release
 
@@ -56,10 +56,10 @@ Enforced by the local pre-tag check (subsection 9) — and, once publishing is l
 
 ### 5. How the bundle maps onto the publish pipeline
 
-*Cross-reference only — the pipeline itself is defined in `publish.yml`; don't duplicate it here.*
+*Cross-reference only — the pipeline itself is defined in `publish.yml`; don't duplicate it here.* The inline toolchain-setup/login/metadata/build-push steps are not in the workflow: they live in the shared composite action `.github/actions/build-image/action.yml`, which both publish workflows call. Each caller keeps its own triggers, guards and tag policy (`publish-dev.yml` passes `flavor: latest=false` there); the release-path flavor policy is the Image tags bullet below.
 
 - On a `v*` tag push, `publish.yml` builds from **this repo@tag** (the tag pins the Dockerfile, compose, CI workflow, and `release.json`) plus `mushpi-server` and `mushpi-client` checked out at their **default-branch HEAD** — the tag pins no sub-repo code (`REFERENCE.md` → Tag & CI semantics). On tag builds the workflow also checks out `mushpi-grow` and `mushpi-mock` and runs the bundle-parity check.
-- Image tags: `type=ref,event=tag` keeps the `v` (image tag `v0.8.0`), and `type=sha` adds a `sha-<short>` tag. `latest` comes from **two independent mechanisms**: the metadata-action's default `flavor` (`latest=auto`) generates `latest` for tag-type rules, so a `v*` tag push moves `latest` on its own, with no explicit rule needed; and the workflow's explicit `type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}` rule covers pushes to `main` — bound to the `main` branch **by ref**, deliberately not to the repository's default-branch setting, so changing which branch is the default can neither enable nor disable `latest` on `main` pushes. Net effect: tag pushes carry `latest` via the flavor default, and `main` branch pushes carry it via the explicit rule.
+- Image tags: `type=ref,event=tag` keeps the `v` (image tag `v0.8.0`), and `type=sha` adds a `sha-<short>` tag. `latest` comes from **two independent mechanisms**, so both must be visible in the workflow rather than one of them being implicit — hence `publish.yml` passes the metadata-action `flavor` as `latest=auto` **explicitly** (behaviour unchanged; it was the action's default before). The explicit flavor generates `latest` for tag-type rules, so a `v*` tag push moves `latest` on its own, with no explicit rule needed; and the workflow's explicit `type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}` rule covers pushes to `main` — bound to the `main` branch **by ref**, deliberately not to the repository's default-branch setting, so changing which branch is the default can neither enable nor disable `latest` on `main` pushes. Net effect: tag pushes carry `latest` via the explicit flavor, and `main` branch pushes carry it via the explicit rule.
 - **The release version is the image-version axis.** The server's own version rides *inside* the image (`package.json` + the OpenAPI `info.version`) — it is not the image tag.
 - **Firmware never enters the image** — Pico units are flashed over USB; the manifest is the only place a release records the firmware it was tested against.
 
@@ -115,3 +115,22 @@ At this repo's root, with the four siblings materialized, just before tagging:
 It must print `OK — release X.Y.Z is consistent`. It checks the manifest shape, the tag⇔`release` equality, that no version moved backward, that `release.json` matches the committed component versions (server/client `package.json`, firmware `_SOFTWARE_VERSION`, mock `VERSION`), and that each component's spec `info.version` matches. Requires `jq`.
 
 **Rollback** is just pinning the compose `image:` tag to the older `vX.Y.Z` image tag and `docker compose up -d`.
+
+## Dev & Pre-Release Image Builds (`publish-dev.yml`)
+
+A manual-only complement to the release workflow above: Actions → *publish-dev* → Run workflow. It builds the same image and publishes it to GHCR without touching the release path.
+
+**Inputs:**
+
+- `ops_ref` — the `mushpi-ops` ref to build (default `main`).
+- `server_ref` / `client_ref` — optional pins for the two sub-repos to specific refs; blank uses their default branches.
+- `image_tag` — required, free-form.
+- `push` — toggle; off builds without publishing.
+
+**Tag rules:** `latest` and a strict release-shaped `vX.Y.Z` are rejected, so a dev run can never be confused with a release or move `latest`. Pre-release-shaped tags such as `0.9.0-rc1` are accepted. Each build additionally gets a `dev-sha-<short>` tag for traceability. `latest` is still owned solely by the normal release workflow.
+
+Dev builds deliberately skip the release-manifest guard and `scripts/verify-release.sh` — they are not bundle releases.
+
+**Pre-release convention.** To test a candidate before a release, dispatch with `image_tag: 0.9.0-rc1`, and pull it on the target host via `MUSHPI_IMAGE_TAG`. The real release is still cut the normal way — the `vX.Y.Z` tag plus the matching `release.json` change in one commit, through `publish.yml`. Never retag an rc image as the release; rebuild it on the tag.
+
+**Cleanup (manual).** Dev tags are not deleted automatically and there is no retention policy. Delete stale versions by hand from the GHCR package page for `ghcr.io/mushroom-pi/mushpi` (or via the GitHub API) when they pile up.

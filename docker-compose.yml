@@ -1,6 +1,6 @@
 services:
   mushpi:
-    image: ghcr.io/mushroom-pi/mushpi:latest
+    image: ghcr.io/mushroom-pi/mushpi:${MUSHPI_IMAGE_TAG:-latest}
 
     # Developer source build (build context = this repository root; the sibling
     # sub-repos are materialized as transient clones — see REFERENCE.md — so a
@@ -27,7 +27,11 @@ services:
 
     volumes:
       # Persists SQLite DB + uploaded images + logs across restarts/reimages.
-      # Create ./data once as your normal user (the Pi 'pi' user is UID 1000,
-      # matching the image's `node` user); if it's owned by root run:
-      #   sudo chown -R 1000:1000 ./data
-      - ./data:/data
+      # Host directory is MUSHPI_DATA_DIR (set in .env or the environment);
+      # defaults to ./mushpi-data next to this compose file. It must be writable by
+      # UID 1000 (the image's `node` user — the Pi 'pi' user matches); the
+      # container's entrypoint (scripts/docker-entrypoint.sh) checks this on
+      # start and fails with a clear message. If it reports the directory is
+      # root-owned, fix it on the host:
+      #   sudo chown -R 1000:1000 <MUSHPI_DATA_DIR>
+      - "${MUSHPI_DATA_DIR:-./mushpi-data}:/data"

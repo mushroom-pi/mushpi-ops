@@ -15,6 +15,7 @@ coverage
 
 # Runtime data — must never be baked into the image
 data
+mushpi-data
 data-test
 *.sqlite
 *.sqlite-journal
@@ -36,12 +37,14 @@ docker-compose*.yml
 .dockerignore
 README.md
 
-# Sub-repos not part of the image build context (keep the context lean)
+# Sub-repos that are never build inputs (keep the context lean).
+# mushpi-grow / mushpi-mock are cloned here only for a local
+# scripts/verify-release.sh run; mushpi-docs is never built at all.
+# NOTE: mushpi-server and mushpi-client are the build inputs — the Dockerfile
+# COPYs from both — and must NEVER be listed in this file.
 mushpi-grow
 mushpi-mock
 mushpi-docs
-be-pico-hub
-.opencode
 
 # IDE / hooks
 .vscode

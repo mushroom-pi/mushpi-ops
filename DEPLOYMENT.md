@@ -2,7 +2,7 @@
 
 How to run the Mushroom Pi system on your own hardware: what gets deployed, and the operator procedures for SD-card provisioning, first boot, Pico setup, updates, backups, and Tailscale remote access.
 
-> **Status: still being written.** What exists today: the "What you are deploying" summary below (complete and accurate), the stack configuration in "First boot" and the backup note in "Backup", plus the remaining procedure headings. The step-by-step procedures beyond that are placeholders — each section says so — and will be filled in as the deployment workstream lands.
+> **Status: still being written.** What exists today: the "What you are deploying" summary below (complete and accurate), **Prerequisites**, the stack configuration in "First boot" and the backup note in "Backup", plus the remaining procedure headings. The step-by-step procedures beyond that are placeholders — each section says so — and will be filled in as the deployment workstream lands.
 
 This document is the operator-facing half — how to run the system. The maintainer-facing half (packaging internals and the release process) lives in `MAINTAINING.md`.
 
@@ -11,7 +11,7 @@ This document is the operator-facing half — how to run the system. The maintai
 A single container that serves the React dashboard and the NestJS API on one port:
 
 - **One image, one port, one volume.** The server serves the built client (static SPA) on port 3000; production is same-origin (CORS is dev-only, via `CLIENT_URL`).
-- **Published image.** You pull `ghcr.io/mushroom-pi/mushpi` from GitHub Container Registry — you never build it. You clone **this repository** (`mushpi-ops`) and run `docker compose up -d`; `docker-compose.yml` is the entry point. The local build toggle (`docker-compose.override.yml`) is untracked, so it never ships in a clone — a plain `docker compose up -d` always pulls the published image.
+- **Published image.** You pull `ghcr.io/mushroom-pi/mushpi` from GitHub Container Registry — you never build it, and the package is public, so the pull needs **no credentials**. You clone **this repository** (`mushpi-ops`) and run `docker compose up -d`; `docker-compose.yml` is the entry point. The local build toggle (`docker-compose.override.yml`) is untracked, so it never ships in a clone — a plain `docker compose up -d` always pulls the published image.
 - **Remote access via Tailscale.** A private WireGuard-based mesh VPN. No port forwarding, no TLS certificates, no public exposure. MagicDNS gives the phone a hostname; Headscale is the documented self-host escape hatch.
 - **Target hardware.** Raspberry Pi 3 (1GB) on Raspberry Pi OS Lite 64-bit, with Docker and `restart: unless-stopped` for boot persistence.
 - **SD-card provisioning.** Raspberry Pi Imager "advanced options" — pre-bake the WiFi SSID/password, enable SSH, and set the hostname before first boot. No GUI desktop.
@@ -22,7 +22,25 @@ A single container that serves the React dashboard and the NestJS API on one por
 
 ### Prerequisites
 
-> TODO — being written.
+**Hardware and OS**
+
+- **Raspberry Pi 3 (1GB)** or newer, running **Raspberry Pi OS Lite 64-bit**.
+- **The 64-bit OS is a hard requirement, not a preference.** The published image targets `linux/arm64` (plus `linux/amd64`), so a 32-bit install cannot run it at all: `docker pull` fails with `no matching manifest for linux/arm/v7 in the manifest list entries`. The Pi 3's CPU *is* 64-bit capable, but the familiar 32-bit Raspberry Pi OS image is not — select **64-bit** in Raspberry Pi Imager (Lite; no desktop needed).
+- **Memory is tight.** 1GB is enough for this stack but leaves little headroom; avoid running other services alongside it.
+
+**Software**
+
+- **Docker Engine with the Compose v2 plugin.** You need the `docker compose` subcommand (space), not the legacy `docker-compose` script (hyphen). `curl -fsSL https://get.docker.com | sh` installs both; then add your user to the `docker` group so you can run compose without `sudo`.
+- **`git`**, to clone this repository on the Pi.
+- That is all. **No registry login is needed** — the image is public, so `docker compose pull` runs anonymously. Do not put a GitHub token on the Pi.
+
+**Network**
+
+- Outbound HTTPS to `ghcr.io`, to pull the image.
+- LAN access between the Pi and the Pico unit(s): the server polls each unit over the local network, and each unit announces itself to the server when it boots.
+- Browsers on your LAN reach the dashboard on the Pi's port 3000. For access from outside your LAN, use Tailscale (below) rather than exposing that port.
+
+> **If a pull fails with `unauthorized` or `denied`**, the package's visibility has been set back to private. A public package never asks for credentials, so this is the first thing to check — see the package's settings on GitHub.
 
 ### SD-card provisioning
 

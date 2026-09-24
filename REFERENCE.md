@@ -2,7 +2,7 @@
 
 Long-tail gotchas for the release/packaging layer. **Load only when the task touches these areas** — do not read on every spawn. The always-loaded [`AGENTS.md`](./AGENTS.md) holds the file map, the sibling-materialization model, verification commands, and core conventions.
 
-Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-sqlite3` native build · client API regeneration + `tsc` gate · entrypoint & runtime details · `release.json` in the build context · tag & CI semantics · dev / pre-release image builds · shared build action · local verify/build prerequisites · `docker-compose.override.yml` & local `.env`.
+Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-sqlite3` native build · client API regeneration + `tsc` gate · entrypoint & runtime details · rate limiting (`MAX_REQUESTS` / `MAX_REQUESTS_TIME`) · `release.json` in the build context · tag & CI semantics · dev / pre-release image builds · shared build action · local verify/build prerequisites · `docker-compose.override.yml` & local `.env`.
 
 ---
 
@@ -53,6 +53,15 @@ Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-
 - **On an HTTP deployment `true` breaks the UI.** `upgrade-insecure-requests` makes the browser rewrite the SPA's own asset URLs to `https://` with no HTTP fallback, so the page renders blank white with no API calls and the console reports `SSL_ERROR_RX_RECORD_TOO_LONG` (TLS spoken to a plaintext port). Browsers exempt `localhost` as a trustworthy origin, which is why it bites a LAN hostname/IP but not local dev.
 - Set it `true` only when TLS is genuinely terminated in front (Tailscale Serve, a reverse proxy) or served directly.
 - Server-side detail (the schema flag, the middleware, the HSTS/CSP gating) lives in `mushpi-server/REFERENCE.md`.
+
+## Rate limiting (`MAX_REQUESTS` / `MAX_REQUESTS_TIME`)
+
+- Throttling is **opt-in**: it registers only when **both** vars are set as positive integers — `MAX_REQUESTS` (requests per window) and `MAX_REQUESTS_TIME` (window length in **milliseconds**). Recommended starting values `MAX_REQUESTS=300` / `MAX_REQUESTS_TIME=60000` (≈5 req/s sustained per client IP), shipped commented out in `.env.example`. With the pair absent the server registers no throttler: no 429s and **no `X-RateLimit-*` headers at all**. Setting **only one** is a configuration error — the server fails at boot rather than half-configuring the guard.
+- The pair is **deliberately not hard-coded** in `docker-compose.yml` or the `Dockerfile`: a hard default would silently override the server's opt-in design with no clean off switch, and would surface as unexplained 429s on the dashboard's read endpoints. Activation is operator-side only — compose passes `.env` through the service's `env_file`, so uncommenting the pair in `.env` is the entire mechanism.
+- The tracker is **per client IP, per container instance**: in-memory, resets on restart/redeploy, not shared across replicas.
+- The server does **not** enable Express `trust proxy`, so behind a reverse proxy every client appears to come from the proxy's IP and shares one bucket — size the limit accordingly, or leave the pair unset.
+- Route scope: `/health` is always exempt (`@SkipThrottle()`), so the container HEALTHCHECK can never be rate limited; `/ping` and the `/v1/*` application routes are throttled only when the pair is configured.
+- Server-side detail (the Joi pair validation, the throttler factory, the guard and header semantics) lives in `mushpi-server/REFERENCE.md`.
 
 ## `release.json` in the build context
 

@@ -103,20 +103,27 @@ COPY --from=client-build /app/dist ./client
 # so it must ship in the runtime image or the assets 404.
 COPY --from=server-build /app/public ./public
 
-# Data-directory guard — runs before the server command, as the `node` user
-# (see the ENTRYPOINT below): verifies /data and its subdirs are writable and
-# fails with an operator-readable hint otherwise.
+# Data-directory guard + privilege drop — the container starts as root, this
+# script creates /data and its images/logs subdirs, ensures node:node ownership,
+# then drops to the `node` user with setpriv and execs the CMD. Fails loudly
+# (with an operator-readable remedy) if it runs unprivileged and /data is not
+# writable. See REFERENCE.md for the full behaviour.
 COPY scripts/docker-entrypoint.sh /usr/src/app/docker-entrypoint.sh
 RUN chmod +x /usr/src/app/docker-entrypoint.sh
 
 # ServeStaticModule requires this absolute path in prod (Joi-enforced).
 ENV CLIENT_DIST_DIR=/usr/src/app/client
 
-# Single persisted volume: SQLite DB + uploaded images + logs.
+# Single persisted volume: SQLite DB + uploaded images + logs. The chown keeps
+# the no-volume smoke-test path working (the entrypoint fixes ownership on a
+# bind-mount instead, so a fresh host dir needs no manual preparation).
 RUN mkdir -p /data/logs /data/images \
     && chown -R node:node /data
 
-USER node
+# No USER directive: the entrypoint drops root → node via setpriv before
+# exec'ing the server, so a root start can repair a daemon-created bind-mount
+# source dir. Consequence: `docker exec` into a running container defaults to
+# root, not `node`.
 EXPOSE 3000
 
 # Liveness probe (Node built-in fetch — no curl/wget in -slim). APP_SECRET is

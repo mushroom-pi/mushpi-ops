@@ -36,10 +36,23 @@ Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-
 
 ### Entrypoint & data directory
 
-- The runtime `ENTRYPOINT` is `scripts/docker-entrypoint.sh`: it `mkdir -p`s `/data` plus its `images`/`logs` subdirs, then requires `/data` to be writable by the running UID (1000 — the `node` user, matching Raspberry Pi OS's default `pi` user), and finally `exec "$@"`. It runs as `node` — never root, never chowns.
-- An unwritable or root-owned host directory (the bind-mounted `MUSHPI_DATA_DIR`, default `./mushpi-data`) makes the container exit 1 with an operator-readable hint: `sudo chown -R 1000:1000 <MUSHPI_DATA_DIR>`.
-- No-volume fallback: run the image with no `/data` mount and the tree baked into the image (created and owned in the runtime stage) still passes the check — `docker run ghcr.io/mushroom-pi/mushpi` boots fine for smoke tests; data just doesn't persist.
-- An override command passed to `docker run` (e.g. `docker run … bash`) is still guarded: the entrypoint checks first, then `exec`s it.
+- The runtime `ENTRYPOINT` is `scripts/docker-entrypoint.sh`. The image has **no `USER` directive** — it starts as root so the entrypoint can fix a host bind-mount the Docker daemon created as `root` (a fresh clone has no `./mushpi-data`, and the daemon creates a missing bind-mount source root-owned). It then drops privileges and `exec`s the CMD as `node` (UID/GID 1000, matching Raspberry Pi OS's default `pi` user).
+- As root it `mkdir -p`s `/data`, `/data/images` and `/data/logs`, and for each one — only when the top-level owner is not already `node:node` — runs `chown -R node:node`. The `stat` guard keeps the recursive walk off the steady-state restart path.
+- A failed `chown` (read-only mount, or a filesystem that maps root to an unprivileged user such as NFS `root_squash`) exits 1 telling the operator to pre-create the directory as UID/GID 1000 on the host.
+- Ownership alone is not trusted: the entrypoint verifies `/data` is writable *as `node`* (`setpriv … test -w`) before dropping, so a permission surprise fails loudly instead of surfacing inside the app.
+- **Do not "simplify" this back to an assert-only guard.** The earlier never-chown version made `docker compose up` fail on every fresh clone — the reported first-run bug.
+- Unprivileged starts stay guarded: `docker run --user <non-root>` skips the root branch, and an unwritable/root-owned `/data` exits 1 with the host remedy `sudo chown -R <uid>:<gid> <MUSHPI_DATA_DIR>`.
+- No-volume fallback: run the image with no `/data` mount and the baked tree (created and owned in the runtime stage) still passes — `docker run ghcr.io/mushroom-pi/mushpi` boots fine for smoke tests; data just doesn't persist.
+- An override command passed to `docker run` (e.g. `docker run … bash`) is still guarded: ownership is fixed, privileges dropped, then it is `exec`ed.
+- **Consequence of the root start: `docker exec` now lands as root, not `node`.** PID 1 still runs as `node`; only the exec default changed. Pass `--user node` when it matters.
+
+## `APP_HTTPS_ENABLED` (browser-facing HTTPS)
+
+- Interpolated from `.env` and passed **into** the container as `APP_HTTPS_ENABLED: ${APP_HTTPS_ENABLED:-false}`. Unlike `MUSHPI_DATA_DIR`/`MUSHPI_IMAGE_TAG` it is a runtime env var, not interpolation-only. It declares the browser-facing deployment; it does **not** configure TLS.
+- Keep it `false` (the default) for any plain-HTTP deployment — a LAN Pi is one. When `true`, the server sends `Strict-Transport-Security` and retains the CSP `upgrade-insecure-requests` directive; when `false` it sends neither.
+- **On an HTTP deployment `true` breaks the UI.** `upgrade-insecure-requests` makes the browser rewrite the SPA's own asset URLs to `https://` with no HTTP fallback, so the page renders blank white with no API calls and the console reports `SSL_ERROR_RX_RECORD_TOO_LONG` (TLS spoken to a plaintext port). Browsers exempt `localhost` as a trustworthy origin, which is why it bites a LAN hostname/IP but not local dev.
+- Set it `true` only when TLS is genuinely terminated in front (Tailscale Serve, a reverse proxy) or served directly.
+- Server-side detail (the schema flag, the middleware, the HSTS/CSP gating) lives in `mushpi-server/REFERENCE.md`.
 
 ## `release.json` in the build context
 
@@ -87,3 +100,4 @@ Topics covered here: build-context layout · Yarn Berry 4 / Corepack · `better-
 
 - `docker-compose.override.yml` is untracked by design: it switches compose from pulling the published image to building locally. Self-hosters' clones never contain it.
 - Copy `.env.example` → `.env` before a local `docker compose up`. `.env` is gitignored and never committed.
+- **A local build can silently run a stale published image.** In build mode the image is tagged from the base file's `image:` field, so if `MUSHPI_IMAGE_TAG` names a tag already present locally (e.g. a pulled `0.9.0-alpha`), `docker compose up -d` skips the rebuild and starts the old image. Use a private tag for local verification (or force the rebuild) so you are testing the tree you built.

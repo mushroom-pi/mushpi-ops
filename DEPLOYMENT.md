@@ -2,7 +2,7 @@
 
 How to run the Mushroom Pi system on your own hardware: what gets deployed, and the operator procedures for SD-card provisioning, first boot, Pico setup, updates, backups, and Tailscale remote access.
 
-> **Status: still being written.** What exists today: the "What you are deploying" summary below (complete and accurate), **Prerequisites**, the stack configuration in "First boot" and the backup note in "Backup", plus the remaining procedure headings. The step-by-step procedures beyond that are placeholders — each section says so — and will be filled in as the deployment workstream lands.
+> **Status: still being written.** What exists today: the "What you are deploying" summary below (complete and accurate), **Prerequisites**, **SD-card provisioning**, the stack configuration in "First boot" and the backup note in "Backup", plus the remaining procedure headings. The step-by-step procedures beyond that are placeholders — each section says so — and will be filled in as the deployment workstream lands.
 
 This document is the operator-facing half — how to run the system. The maintainer-facing half (packaging internals and the release process) lives in `MAINTAINING.md`.
 
@@ -14,7 +14,7 @@ A single container that serves the React dashboard and the NestJS API on one por
 - **Published image.** You pull `ghcr.io/mushroom-pi/mushpi` from GitHub Container Registry — you never build it, and the package is public, so the pull needs **no credentials**. You clone **this repository** (`mushpi-ops`) and run `docker compose up -d`; `docker-compose.yml` is the entry point. The local build toggle (`docker-compose.override.yml`) is untracked, so it never ships in a clone — a plain `docker compose up -d` always pulls the published image.
 - **Remote access via Tailscale.** A private WireGuard-based mesh VPN. No port forwarding, no TLS certificates, no public exposure. MagicDNS gives the phone a hostname; Headscale is the documented self-host escape hatch.
 - **Target hardware.** Raspberry Pi 3 (1GB) on Raspberry Pi OS Lite 64-bit, with Docker and `restart: unless-stopped` for boot persistence.
-- **SD-card provisioning.** Raspberry Pi Imager "advanced options" — pre-bake the WiFi SSID/password, enable SSH, and set the hostname before first boot. No GUI desktop.
+- **SD-card provisioning.** Raspberry Pi Imager (≥ 2.0.6) "OS customisation" — pre-bake the WiFi SSID/password, enable SSH, and set the hostname before first boot. No GUI desktop.
 
 ## Procedures
 
@@ -44,7 +44,116 @@ A single container that serves the React dashboard and the NestJS API on one por
 
 ### SD-card provisioning
 
-> TODO — Raspberry Pi Imager advanced options (pre-bake WiFi SSID/password, enable SSH, set hostname).
+Prepare the SD card before the Pi's first boot — bake the hostname, user, Wi-Fi, locale and SSH key in so the machine comes up headless and reachable. This is done with **Raspberry Pi Imager**, whose OS-customisation step writes the cloud-init files for you.
+
+**The version trap — check it before you flash.**
+
+> **Note:** Raspberry Pi OS **Trixie** (the current image, released 24 Nov 2025) moved first-boot customisation from the legacy `firstrun.sh` script to **cloud-init**. **Raspberry Pi Imager 1.9.x and earlier cannot customise a Trixie image, and fail silently** — no error, the settings are simply not applied: username, Wi-Fi, keyboard and SSH are all silently absent. Use **Imager ≥ 2.0.6** (2.0.0 has a separate write-speed defect). Check your version first via **Help → About**.
+
+**The OS-list trap.**
+
+> **Note:** Imager's customisation UI only appears when Raspberry Pi OS is chosen **from Imager's own OS list**. Flashing a pre-downloaded image via **"Custom image"** disables the customisation UI entirely — if you must flash a downloaded image, use the manual alternative below.
+
+**What to set in Imager's OS Customisation:**
+
+- **General:** hostname; username + password; Wi-Fi SSID + password **and the Wi-Fi country code** (easy to miss); locale, timezone and keyboard.
+- **Services:** enable SSH with **public-key authentication only**, and paste the **contents of a `.pub` file** (one line). This becomes the `authorized_keys` entry for the created user. The private key never leaves your machine.
+- Imager writes three files to the boot partition: `meta-data`, `network-config`, `user-data`.
+
+> **Note:** A **Raspberry Pi 3 Model B is 2.4 GHz-only** — a 5 GHz-only or band-steered SSID will not be visible to it. Pick a 2.4 GHz network (or enable the 2.4 GHz band on the router) before flashing.
+
+**Verify before first boot — the discipline that turns this from guesswork into verification.**
+
+After writing, mount the card's FAT32 boot partition (the volume Windows and macOS show automatically; the rest is ext4) and read `user-data`. Confirm the `users:` block has the intended `name:` and an `ssh_authorized_keys:` entry beginning `ssh-ed25519` or `ssh-rsa` — **never** `-----BEGIN` (a private key pasted there is both useless and a leak). If the file is absent, nothing was customised — see the version trap above.
+
+**Manual alternative — write the three files yourself.**
+
+Any flasher, or a pre-downloaded image: create three files at the root of the boot partition.
+
+`meta-data`:
+
+```yaml
+instance-id: <unique-name>
+local-hostname: <hostname>
+```
+
+`user-data` — the `#cloud-config` first line is **mandatory**:
+
+```yaml
+#cloud-config
+hostname: <hostname>
+manage_etc_hosts: true
+timezone: Europe/Madrid
+locale: en_GB.UTF-8
+keyboard:
+  layout: gb
+users:
+  - name: <username>
+    groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: "<strong-password>"
+    ssh_authorized_keys:
+      - <public-key-line>
+    sudo: ALL=(ALL) NOPASSWD:ALL
+enable_ssh: true
+ssh_pwauth: false
+```
+
+`network-config` (netplan v2, rendered by NetworkManager):
+
+```yaml
+network:
+  version: 2
+  wifis:
+    renderer: NetworkManager
+    wlan0:
+      dhcp4: true
+      regulatory-domain: "ES"
+      access-points:
+        "<SSID>":
+          password: "<wifi-password>"
+      optional: true
+```
+
+- The `rpi:` block (SPI/I2C/serial/USB-gadget) is **not needed** for this host — the Pico owns the GPIO.
+- Keep the account password even with key-only SSH, or `sudo` will fail unless NOPASSWD is granted.
+- Save as UTF-8 **without BOM** and with LF line endings — a BOM breaks `#cloud-config` detection.
+
+**Secrets — these files are plaintext.**
+
+> **Note:** These files sit on a plain FAT partition readable by any OS with no authentication, and the Wi-Fi and account passwords are **plaintext** in them. Unlike `firstrun.sh` they are not documented as self-deleting — decide deliberately whether to remove them after a successful first boot. Real values must never be committed to the repository: the examples here use placeholders only.
+
+**Connecting afterwards — the trap that costs an hour.**
+
+OpenSSH's client only offers keys with default names (`id_rsa`, `id_ecdsa`, `id_ed25519`, `id_dsa`) or keys already loaded in `ssh-agent`. If the authorized key has any other filename, `ssh` never offers it and the server answers `Permission denied (publickey)`. Pass the key explicitly with `-i` **plus** `-o IdentitiesOnly=yes` — best made permanent in `~/.ssh/config`:
+
+```
+Host mushpi
+    HostName <hostname>.local
+    User <username>
+    IdentityFile ~/.ssh/<key>
+    IdentitiesOnly yes
+```
+
+Then:
+
+- `sshd` returns the **same** `Permission denied (publickey)` for a nonexistent username as for a wrong key — a wrong username is indistinguishable from a wrong key.
+- The first connection prints an unknown-host-key prompt — accepting it is normal; a later **changed** host key means a re-flash, cleared with `ssh-keygen -R <hostname>.local`.
+- `ssh -v` shows which keys are offered (`Offering public key: …`).
+
+**First boot — confirm the bake.**
+
+cloud-init runs on first boot and takes about a minute — don't conclude failure early. Then confirm the settings landed:
+
+```bash
+hostname
+uname -m                    # expect aarch64
+cat /proc/device-tree/model
+ip -brief addr
+```
+
+Changing the Wi-Fi network after the unit is running is a different procedure, covered in the user guide (`mushpi-docs/user-guide/host-wifi.md`).
 
 ### First boot
 
